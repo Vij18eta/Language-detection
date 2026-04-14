@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroLingo Pulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --ink: #132033;
+            --ink-soft: #5c6d88;
+            --paper: #eef4ff;
+            --panel: rgba(248, 250, 255, 0.78);
+            --line: rgba(80, 72, 152, 0.14);
+            --blue: #2f6bff;
+            --blue-deep: #1c3faa;
+            --purple: #7c3aed;
+            --purple-deep: #4f1fb8;
+            --crimson: #d61f69;
+            --crimson-deep: #8f1548;
+            --peacock: #0f8f88;
+            --peacock-deep: #0b6661;
+            --glow: rgba(124, 58, 237, 0.28);
+            --shadow: 0 24px 70px rgba(43, 55, 125, 0.18);
+            --radius: 24px;
+            --hero-text: #182338;
+            --input-bg: rgba(255, 255, 255, 0.82);
+            --panel-strong: rgba(255, 255, 255, 0.72);
+        }
+
+        body.dark-theme {
+            --ink: #edf3ff;
+            --ink-soft: #a6b7d7;
+            --paper: #09111f;
+            --panel: rgba(10, 16, 33, 0.76);
+            --line: rgba(132, 111, 255, 0.18);
+            --blue: #5aa0ff;
+            --blue-deep: #2f6bff;
+            --purple: #9d6cff;
+            --purple-deep: #6d38e8;
+            --crimson: #ff4f8c;
+            --crimson-deep: #c91f67;
+            --peacock: #1ec7bc;
+            --peacock-deep: #11998f;
+            --glow: rgba(90, 160, 255, 0.2);
+            --shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+            --hero-text: #f4f7ff;
+            --input-bg: rgba(11, 18, 36, 0.86);
+            --panel-strong: rgba(11, 18, 36, 0.72);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(47, 107, 255, 0.34), transparent 33%),
+                radial-gradient(circle at top right, rgba(15, 143, 136, 0.22), transparent 30%),
+                radial-gradient(circle at 50% 0%, rgba(214, 31, 105, 0.12), transparent 28%),
+                linear-gradient(180deg, #f5f8ff 0%, #e6eeff 100%);
+            transition: background 220ms ease, color 220ms ease;
+        }
+
+        body.dark-theme {
+            background:
+                radial-gradient(circle at top left, rgba(47, 107, 255, 0.24), transparent 34%),
+                radial-gradient(circle at top right, rgba(30, 199, 188, 0.14), transparent 30%),
+                radial-gradient(circle at 50% 0%, rgba(255, 79, 140, 0.12), transparent 30%),
+                linear-gradient(180deg, #060b16 0%, #0d1530 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(72, 86, 166, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(72, 86, 166, 0.06) 1px, transparent 1px);
+            background-size: 28px 28px;
+            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.28), transparent 80%);
+        }
+
+        .app-shell {
+            display: grid;
+            grid-template-columns: 290px minmax(0, 1fr);
+            gap: 22px;
+            padding: 22px;
+            min-height: 100vh;
+        }
+
+        .sidebar, .panel {
+            backdrop-filter: blur(18px);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .sidebar {
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .brand {
+            padding: 18px;
+            border-radius: 22px;
+            background: linear-gradient(145deg, rgba(47, 107, 255, 0.18), rgba(214, 31, 105, 0.12) 52%, rgba(15, 143, 136, 0.14));
+            border: 1px solid rgba(124, 58, 237, 0.18);
+        }
+
+        .brand h1 {
+            margin: 0 0 8px;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 2.2rem;
+            line-height: 0.95;
+            font-weight: 700;
+            letter-spacing: -0.06em;
+            background: linear-gradient(135deg, var(--blue), var(--purple) 42%, var(--crimson) 72%, var(--peacock));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            background-size: 220% 220%;
+            animation: pulseShift 9s ease infinite;
+        }
+
+        .muted { margin: 0; color: var(--ink-soft); }
+
+        .nav-buttons, .side-stack, .settings-grid, .history-list, .insight-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .nav-button, .action-button, .primary-button, .secondary-button {
+            font: inherit;
+            border: 0;
+            cursor: pointer;
+            transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+        }
+
+        .nav-button {
+            padding: 14px 16px;
+            border-radius: 18px;
+            text-align: left;
+            color: var(--ink);
+            background: rgba(255, 255, 255, 0.56);
+            border: 1px solid rgba(124, 58, 237, 0.08);
+        }
+
+        .nav-button.active {
+            background: linear-gradient(135deg, var(--blue), var(--purple) 48%, var(--crimson));
+            color: #fff9f3;
+            box-shadow: 0 16px 40px rgba(79, 31, 184, 0.28);
+        }
+
+        .nav-button:hover, .action-button:hover, .primary-button:hover, .secondary-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: rgba(15, 143, 136, 0.14);
+            color: var(--peacock);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .status-pill.offline {
+            background: rgba(214, 31, 105, 0.12);
+            color: var(--crimson);
+        }
+
+        .workspace, .composer {
+            display: grid;
+            gap: 20px;
+            min-width: 0;
+        }
+
+        .hero {
+            padding: 24px 28px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 18px;
+            align-items: center;
+        }
+
+        .hero h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.8rem, 4vw, 3rem);
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.06em;
+            color: var(--hero-text);
+            text-wrap: balance;
+        }
+
+        .hero-stats, .quick-actions, .composer-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .mini-card, .history-item, .result-highlight, .empty-state {
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: var(--panel-strong);
+            border: 1px solid var(--line);
+        }
+
+        .mini-card strong { display: block; font-size: 1.4rem; }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+            gap: 20px;
+            align-items: start;
+        }
+
+        .chat-panel { padding: 0; overflow: hidden; }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.42));
+        }
+
+        .chat-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 20px;
+            min-height: 420px;
+            max-height: 62vh;
+            overflow-y: auto;
+        }
+
+        .message {
+            max-width: 88%;
+            padding: 16px 18px;
+            border-radius: 22px;
+            white-space: pre-wrap;
+            animation: rise 260ms ease;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid var(--line);
+        }
+
+        .message.user {
+            align-self: flex-end;
+            color: #fff8f0;
+            background: linear-gradient(135deg, var(--blue), var(--purple) 46%, var(--crimson));
+            box-shadow: 0 20px 42px rgba(79, 31, 184, 0.24);
+        }
+
+        .message .meta {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 0.8rem;
+            color: var(--ink-soft);
+        }
+
+        .message.user .meta { color: rgba(255, 248, 240, 0.8); }
+
+        .composer {
+            padding: 16px 20px 20px;
+            border-top: 1px solid var(--line);
+            background: rgba(255, 252, 246, 0.84);
+        }
+
+        .action-button, .secondary-button {
+            padding: 10px 14px;
+            border-radius: 999px;
+            color: var(--ink);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid var(--line);
+        }
+
+        .primary-button {
+            padding: 12px 18px;
+            border-radius: 14px;
+            color: #fff8f0;
+            background: linear-gradient(135deg, var(--blue), var(--purple) 50%, var(--crimson));
+            box-shadow: 0 16px 36px rgba(79, 31, 184, 0.24);
+        }
+
+        textarea, input[type="text"] {
+            width: 100%;
+            font: inherit;
+            border-radius: 18px;
+            border: 1px solid rgba(68, 49, 28, 0.12);
+            padding: 16px 18px;
+            background: var(--input-bg);
+            color: var(--ink);
+            resize: vertical;
+            min-height: 110px;
+        }
+
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            padding: 12px 14px;
+            border-radius: 999px;
+            color: var(--ink);
+            background: linear-gradient(135deg, rgba(47, 107, 255, 0.14), rgba(124, 58, 237, 0.14), rgba(214, 31, 105, 0.14));
+            border: 1px solid var(--line);
+        }
+
+        .brand-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.46);
+            border: 1px solid rgba(124, 58, 237, 0.12);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--purple-deep);
+        }
+
+        .brand-orb {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--blue), var(--crimson), var(--peacock));
+            box-shadow: 0 0 20px var(--glow);
+            animation: orbPulse 2.6s ease-in-out infinite;
+        }
+
+        .hero-shimmer {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--blue), var(--purple) 35%, var(--crimson) 70%, var(--peacock));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            background-size: 220% 220%;
+            animation: pulseShift 8s ease infinite;
+        }
+
+        @keyframes pulseShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes orbPulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.45); opacity: 1; }
+        }
+
+        .panel { padding: 20px; }
+        .panel h3 { margin: 0 0 12px; font-size: 1.05rem; }
+        .result-highlight strong { font-size: 1.8rem; display: block; margin-bottom: 6px; }
+        .history-item strong, .history-item span { display: block; }
+        .history-item span { color: var(--ink-soft); margin-top: 4px; font-size: 0.92rem; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        canvas { width: 100% !important; max-height: 280px; }
+        .settings-grid textarea { min-height: 170px; }
+        .hidden { display: none !important; }
+        .empty-state { color: var(--ink-soft); }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 1100px) {
+            .app-shell, .main-grid, .dashboard-grid, .hero { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 720px) {
+            .app-shell { padding: 14px; }
+            .message { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-kicker"><span class="brand-orb"></span> Multimodal language intelligence</div>
+                <h1>NeuroLingo<br>Pulse</h1>
+                <p>Text, image OCR, documents, history sync, and analytics in one chat-style workspace.</p>
+            </div>
+
+            <div class="nav-buttons">
+                <button class="nav-button active" data-view-button="chat">AI Console</button>
+                <button class="nav-button" data-view-button="history">History</button>
+                <button class="nav-button" data-view-button="dashboard">Dashboard</button>
+                <button class="nav-button" data-view-button="settings">Firebase</button>
+                <button id="themeToggleButton" class="theme-toggle" type="button">Switch to dark</button>
+            </div>
+
+            <div id="syncStatus" class="status-pill offline">Local history mode</div>
+
+            <div class="panel" style="padding:16px;">
+                <h3 style="margin-top:0;">What works now</h3>
+                <div class="insight-list muted">
+                    <span>Text detection with a browser ML classifier</span>
+                    <span>OCR from images with Tesseract.js</span>
+                    <span>PDF, DOCX, and TXT parsing</span>
+                    <span>Firestore sync when Firebase config is added</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <section class="hero panel">
+                <div>
+                    <p class="muted">Realtime language analysis suite</p>
+                    <h2><span class="hero-shimmer">Detect language with style,</span><br>then let the suite read files for you.</h2>
+                    <p class="muted">Upload an image for OCR, parse a document, review cloud history, and watch your language mix evolve on the dashboard.</p>
+                </div>
+                <div class="hero-stats">
+                    <div class="mini-card">
+                        <span class="muted">Scans</span>
+                        <strong id="statScans">0</strong>
+                    </div>
+                    <div class="mini-card">
+                        <span class="muted">Languages</span>
+                        <strong id="statLanguages">0</strong>
+                    </div>
+                    <div class="mini-card">
+                        <span class="muted">Cloud</span>
+                        <strong id="statCloud">Off</strong>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-chat" class="main-grid">
+                <div class="chat-panel panel">
+                    <div class="chat-header">
+                        <div>
+                            <h3 style="margin:0;">AI Analysis Console</h3>
+                            <p class="muted">Paste text, upload an image, or drop a document into the flow.</p>
+                        </div>
+                        <button id="clearChatButton" class="secondary-button" type="button">Clear chat</button>
+                    </div>
+                    <div id="chatThread" class="chat-thread"></div>
+                    <div class="composer">
+                        <div class="quick-actions">
+                            <button id="uploadImageButton" class="action-button" type="button">Scan image</button>
+                            <button id="uploadDocumentButton" class="action-button" type="button">Parse document</button>
+                            <button id="sampleTextButton" class="action-button" type="button">Use sample text</button>
+                        </div>
+                        <label for="textInput" class="muted">Type a message for language detection</label>
+                        <textarea id="textInput" placeholder="Try: Bonjour, comment allez-vous aujourd'hui?"></textarea>
+                        <div class="composer-actions">
+                            <button id="analyzeTextButton" class="primary-button" type="button">Analyze text</button>
+                            <button id="explainLatestButton" class="secondary-button" type="button">Explain latest result</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="side-stack">
+                    <section class="panel">
+                        <h3>Latest Detection</h3>
+                        <div id="latestResult" class="result-highlight">
+                            <strong>Waiting for input</strong>
+                            <span class="muted">Run a text, image, or document scan to populate this panel.</span>
+                        </div>
+                    </section>
+
+                    <section class="panel">
+                        <h3>Insights</h3>
+                        <div id="insightsList" class="insight-list">
+                            <div class="empty-state">Confidence notes, OCR summaries, and parsing details will appear here.</div>
+                        </div>
+                    </section>
+
+                    <section class="panel">
+                        <h3>Recent History</h3>
+                        <div id="recentHistory" class="history-list">
+                            <div class="empty-state">No scans yet.</div>
+                        </div>
+                    </section>
+                </div>
+            </section>
+
+            <section id="view-history" class="panel hidden">
+                <h3>Saved Sessions</h3>
+                <p class="muted">History is stored locally by default and synced to Firestore once Firebase is configured below.</p>
+                <div id="historyView" class="history-list" style="margin-top:16px;">
+                    <div class="empty-state">No saved history yet.</div>
+                </div>
+            </section>
+
+            <section id="view-dashboard" class="hidden">
+                <div class="dashboard-grid">
+                    <div class="panel">
+                        <h3>Language Distribution</h3>
+                        <canvas id="languageChart"></canvas>
+                    </div>
+                    <div class="panel">
+                        <h3>Input Sources</h3>
+                        <canvas id="sourceChart"></canvas>
+                    </div>
+                    <div class="panel">
+                        <h3>Activity Timeline</h3>
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                    <div class="panel">
+                        <h3>Dashboard Notes</h3>
+                        <div id="dashboardSummary" class="insight-list">
+                            <div class="empty-state">Start scanning to generate trends and summaries.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-settings" class="panel hidden">
+                <h3>Firebase Cloud Sync</h3>
+                <p class="muted">Paste your Firebase web app config JSON here to turn local history into Firestore-backed cloud history.</p>
+                <div class="settings-grid">
+                    <textarea id="firebaseConfigInput" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+                    <div class="composer-actions">
+                        <button id="saveFirebaseButton" class="primary-button" type="button">Enable Firebase</button>
+                        <button id="removeFirebaseButton" class="secondary-button" type="button">Disable Firebase</button>
+                    </div>
+                    <div id="firebaseMessage" class="empty-state">Cloud sync is currently off. Local history is still working.</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <input id="imageInput" class="hidden" type="file" accept="image/*">
+    <input id="documentInput" class="hidden" type="file" accept=".txt,.pdf,.doc,.docx">
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        const STORAGE_KEYS = {
+            history: "linguascope-history",
+            firebase: "linguascope-firebase-config",
+            theme: "linguascope-theme"
+        };
+
+        const languageSamples = {
+            English: [
+                "hello how are you today",
+                "the quick brown fox jumps over the lazy dog",
+                "language detection works well with enough context",
+                "please upload a document for analysis"
+            ],
+            Spanish: [
+                "hola como estas hoy",
+                "este sistema detecta idiomas usando texto",
+                "por favor sube un documento para analizar",
+                "gracias por probar esta aplicacion"
+            ],
+            French: [
+                "bonjour comment allez vous aujourd hui",
+                "ce systeme detecte la langue du texte",
+                "veuillez televerser un document a analyser",
+                "merci d essayer cette application"
+            ],
+            German: [
+                "hallo wie geht es dir heute",
+                "dieses system erkennt sprachen aus text",
+                "bitte laden sie ein dokument zur analyse hoch",
+                "danke dass sie diese anwendung testen"
+            ],
+            Italian: [
+                "ciao come stai oggi",
+                "questo sistema rileva la lingua del testo",
+                "per favore carica un documento da analizzare",
+                "grazie per aver provato questa applicazione"
+            ],
+            Hindi: [
+                "namaste aap kaise ho",
+                "yah system text ki bhasha pahchanta hai",
+                "kripya vishleshan ke liye document upload karein",
+                "dhanyavad is application ko use karne ke liye"
+            ]
+        };
+
+        const appState = {
+            currentView: "chat",
+            history: [],
+            latestRecord: null,
+            theme: "light",
+            charts: {
+                language: null,
+                source: null,
+                timeline: null
+            },
+            firebase: {
+                app: null,
+                db: null,
+                enabled: false
+            }
+        };
+
+        const trainedProfiles = buildProfiles(languageSamples);
+
+        function normalizeText(input) {
+            return (input || "")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^\p{L}\p{N}\s]/gu, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        function buildProfiles(sampleMap) {
+            return Object.entries(sampleMap).reduce((profiles, [language, samples]) => {
+                profiles[language] = ngramVector(samples.join(" "));
+                return profiles;
+            }, {});
+        }
+
+        function ngramVector(text) {
+            const normalized = ` ${normalizeText(text)} `;
+            const vector = {};
+
+            for (let size = 2; size <= 4; size += 1) {
+                for (let index = 0; index <= normalized.length - size; index += 1) {
+                    const gram = normalized.slice(index, index + size);
+                    vector[gram] = (vector[gram] || 0) + 1;
+                }
+            }
+
+            return vector;
+        }
+
+        function cosineSimilarity(vectorA, vectorB) {
+            const keys = new Set([...Object.keys(vectorA), ...Object.keys(vectorB)]);
+            let dot = 0;
+            let normA = 0;
+            let normB = 0;
+
+            keys.forEach((key) => {
+                const a = vectorA[key] || 0;
+                const b = vectorB[key] || 0;
+                dot += a * b;
+                normA += a * a;
+                normB += b * b;
+            });
+
+            if (!normA || !normB) {
+                return 0;
+            }
+
+            return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+
+        function detectLanguage(text) {
+            const cleaned = normalizeText(text);
+
+            if (!cleaned) {
+                return { language: "Unknown", confidence: 0, alternatives: [] };
+            }
+
+            const inputVector = ngramVector(cleaned);
+            const scores = Object.entries(trainedProfiles)
+                .map(([language, profile]) => ({
+                    language,
+                    score: cosineSimilarity(inputVector, profile)
+                }))
+                .sort((left, right) => right.score - left.score);
+
+            const best = scores[0];
+            const total = scores.reduce((sum, entry) => sum + entry.score, 0) || 1;
+
+            return {
+                language: best.language,
+                confidence: Math.min(99, Math.max(35, Math.round((best.score / total) * 100))),
+                alternatives: scores.slice(1, 3).map((entry) => ({
+                    language: entry.language,
+                    confidence: Math.round((entry.score / total) * 100)
+                }))
+            };
+        }
+
+        function buildInsights(text, result, source, extra = {}) {
+            const insights = [];
+            const wordCount = normalizeText(text).split(" ").filter(Boolean).length;
+
+            insights.push(`${source} input contained ${wordCount} words.`);
+
+            if (result.confidence < 55) {
+                insights.push("Confidence is modest because the sample is short or mixed.");
+            } else if (result.confidence > 80) {
+                insights.push("Confidence is strong because the n-gram profile matched clearly.");
+            }
+
+            if (extra.ocrTextLength) {
+                insights.push(`OCR extracted ${extra.ocrTextLength} characters from the uploaded image.`);
+            }
+
+            if (extra.documentType) {
+                insights.push(`Document parser recognized a ${extra.documentType.toUpperCase()} file.`);
+            }
+
+            if (result.alternatives.length) {
+                const fallback = result.alternatives.map((entry) => `${entry.language} ${entry.confidence}%`).join(", ");
+                insights.push(`Closest alternatives were ${fallback}.`);
+            }
+
+            return insights;
+        }
+
+        function buildRecord({ source, text, result, extra = {} }) {
+            return {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                timestamp: new Date().toISOString(),
+                source,
+                extractedText: text,
+                language: result.language,
+                confidence: result.confidence,
+                alternatives: result.alternatives,
+                insights: buildInsights(text, result, source, extra),
+                meta: extra
+            };
+        }
+
+        function formatDate(isoString) {
+            return new Date(isoString).toLocaleString([], {
+                dateStyle: "medium",
+                timeStyle: "short"
+            });
+        }
+
+        function chartPalette() {
+            const styles = getComputedStyle(document.body);
+            return {
+                blue: styles.getPropertyValue("--blue").trim(),
+                purple: styles.getPropertyValue("--purple").trim(),
+                crimson: styles.getPropertyValue("--crimson").trim(),
+                peacock: styles.getPropertyValue("--peacock").trim(),
+                line: styles.getPropertyValue("--line").trim(),
+                inkSoft: styles.getPropertyValue("--ink-soft").trim()
+            };
+        }
+
+        function addMessage(role, content, chips = []) {
+            const thread = document.getElementById("chatThread");
+            const message = document.createElement("div");
+            message.className = `message ${role}`;
+
+            const text = document.createElement("div");
+            text.textContent = content;
+            message.appendChild(text);
+
+            if (chips.length) {
+                const meta = document.createElement("div");
+                meta.className = "meta";
+                chips.forEach((chip) => {
+                    const label = document.createElement("span");
+                    label.textContent = chip;
+                    meta.appendChild(label);
+                });
+                message.appendChild(meta);
+            }
+
+            thread.appendChild(message);
+            thread.scrollTop = thread.scrollHeight;
+        }
+
+        function buildAssistantReply(record) {
+            const preview = record.extractedText.length > 180
+                ? `${record.extractedText.slice(0, 180)}...`
+                : record.extractedText;
+
+            const altText = record.alternatives.length
+                ? ` Closest alternatives: ${record.alternatives.map((entry) => `${entry.language} ${entry.confidence}%`).join(", ")}.`
+                : "";
+
+            return `I analyzed the ${record.source.toLowerCase()} input and detected ${record.language} with ${record.confidence}% confidence.\n\nPreview: ${preview}${altText}`;
+        }
+
+        function saveLocalHistory() {
+            localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(appState.history));
+        }
+
+        function loadLocalHistory() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || "[]");
+                appState.history = Array.isArray(saved) ? saved : [];
+            } catch (error) {
+                appState.history = [];
+            }
+        }
+
+        async function saveHistoryRecord(record) {
+            appState.history.unshift(record);
+            saveLocalHistory();
+
+            if (appState.firebase.enabled && appState.firebase.db) {
+                try {
+                    await appState.firebase.db.collection("languageHistory").doc(record.id).set(record);
+                } catch (error) {
+                    console.error("Firebase sync failed:", error);
+                }
+            }
+
+            renderHistory();
+            renderDashboard();
+            renderLatest();
+            renderStats();
+        }
+
+        async function loadFirebaseHistory() {
+            if (!appState.firebase.enabled || !appState.firebase.db) {
+                return;
+            }
+
+            try {
+                const snapshot = await appState.firebase.db.collection("languageHistory").orderBy("timestamp", "desc").limit(100).get();
+                const cloudRecords = snapshot.docs.map((doc) => doc.data());
+                const localIds = new Set(appState.history.map((entry) => entry.id));
+                cloudRecords.forEach((record) => {
+                    if (!localIds.has(record.id)) {
+                        appState.history.push(record);
+                    }
+                });
+                appState.history.sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp));
+                saveLocalHistory();
+            } catch (error) {
+                console.error("Unable to load cloud history:", error);
+            }
+        }
+
+        function getStoredFirebaseConfig() {
+            const raw = localStorage.getItem(STORAGE_KEYS.firebase);
+            if (!raw) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch (error) {
+                return null;
+            }
+        }
+
+        async function initializeFirebase(config) {
+            if (!config || !config.apiKey || !config.projectId || !config.appId) {
+                throw new Error("Invalid Firebase config");
+            }
+
+            if (firebase.apps.length) {
+                await firebase.apps[0].delete();
+            }
+
+            appState.firebase.app = firebase.initializeApp(config);
+            appState.firebase.db = firebase.firestore();
+            appState.firebase.enabled = true;
+            localStorage.setItem(STORAGE_KEYS.firebase, JSON.stringify(config));
+            updateSyncUi("Firebase cloud sync enabled", true);
+            await loadFirebaseHistory();
+        }
+
+        function disableFirebase() {
+            localStorage.removeItem(STORAGE_KEYS.firebase);
+            appState.firebase = {
+                app: null,
+                db: null,
+                enabled: false
+            };
+            updateSyncUi("Cloud sync is disabled. Local history is still active.", false);
+        }
+
+        function updateSyncUi(message, online) {
+            const pill = document.getElementById("syncStatus");
+            const messageBox = document.getElementById("firebaseMessage");
+            pill.textContent = online ? "Firebase cloud sync active" : "Local history mode";
+            pill.className = `status-pill${online ? "" : " offline"}`;
+            messageBox.textContent = message;
+            renderStats();
+        }
+
+        async function analyzeAndStore(text, source, extra = {}) {
+            const result = detectLanguage(text);
+            const record = buildRecord({ source, text, result, extra });
+            appState.latestRecord = record;
+
+            addMessage("assistant", buildAssistantReply(record), [
+                `Language: ${record.language}`,
+                `Confidence: ${record.confidence}%`,
+                `Source: ${record.source}`
+            ]);
+
+            await saveHistoryRecord(record);
+        }
+
+        function renderLatest() {
+            const target = document.getElementById("latestResult");
+            if (!appState.latestRecord) {
+                target.innerHTML = '<strong>Waiting for input</strong><span class="muted">Run a text, image, or document scan to populate this panel.</span>';
+                document.getElementById("insightsList").innerHTML = '<div class="empty-state">Confidence notes, OCR summaries, and parsing details will appear here.</div>';
+                return;
+            }
+
+            const record = appState.latestRecord;
+            target.innerHTML = `
+                <strong>${record.language}</strong>
+                <span class="muted">${record.confidence}% confidence from ${record.source.toLowerCase()} input</span>
+                <span class="muted">Saved ${formatDate(record.timestamp)}</span>
+            `;
+
+            const insights = document.getElementById("insightsList");
+            insights.innerHTML = "";
+            record.insights.forEach((insight) => {
+                const item = document.createElement("div");
+                item.className = "history-item";
+                item.textContent = insight;
+                insights.appendChild(item);
+            });
+        }
+
+        function historyTemplate(record) {
+            const preview = record.extractedText.length > 140
+                ? `${record.extractedText.slice(0, 140)}...`
+                : record.extractedText;
+
+            return `
+                <article class="history-item">
+                    <strong>${record.language} · ${record.confidence}%</strong>
+                    <span>${record.source} · ${formatDate(record.timestamp)}</span>
+                    <span>${preview}</span>
+                </article>
+            `;
+        }
+
+        function renderHistory() {
+            const recent = document.getElementById("recentHistory");
+            const historyView = document.getElementById("historyView");
+            const records = appState.history;
+
+            if (!records.length) {
+                const empty = '<div class="empty-state">No scans yet.</div>';
+                recent.innerHTML = empty;
+                historyView.innerHTML = empty;
+                return;
+            }
+
+            recent.innerHTML = records.slice(0, 4).map(historyTemplate).join("");
+            historyView.innerHTML = records.map(historyTemplate).join("");
+        }
+
+        function renderStats() {
+            document.getElementById("statScans").textContent = appState.history.length;
+            document.getElementById("statLanguages").textContent = new Set(appState.history.map((entry) => entry.language)).size;
+            document.getElementById("statCloud").textContent = appState.firebase.enabled ? "On" : "Off";
+        }
+
+        function aggregateBy(items, keyFn) {
+            return items.reduce((accumulator, item) => {
+                const key = keyFn(item);
+                accumulator[key] = (accumulator[key] || 0) + 1;
+                return accumulator;
+            }, {});
+        }
+
+        function drawChart(key, canvasId, type, data) {
+            const ctx = document.getElementById(canvasId);
+            const palette = chartPalette();
+            if (appState.charts[key]) {
+                appState.charts[key].destroy();
+            }
+
+            appState.charts[key] = new Chart(ctx, {
+                type,
+                data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: palette.inkSoft
+                            }
+                        }
+                    },
+                    scales: type === "doughnut" ? {} : {
+                        x: {
+                            ticks: {
+                                color: palette.inkSoft
+                            },
+                            grid: {
+                                color: palette.line
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: palette.inkSoft
+                            },
+                            grid: {
+                                color: palette.line
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderDashboard() {
+            const records = appState.history;
+            const palette = chartPalette();
+            const languageCounts = aggregateBy(records, (entry) => entry.language);
+            const sourceCounts = aggregateBy(records, (entry) => entry.source);
+            const timelineCounts = aggregateBy(records, (entry) => entry.timestamp.slice(0, 10));
+
+            drawChart("language", "languageChart", "bar", {
+                labels: Object.keys(languageCounts),
+                datasets: [{
+                    label: "Detections",
+                    data: Object.values(languageCounts),
+                    backgroundColor: [palette.blue, palette.purple, palette.crimson, palette.peacock, "#6f86ff", "#8b5cf6"]
+                }]
+            });
+
+            drawChart("source", "sourceChart", "doughnut", {
+                labels: Object.keys(sourceCounts),
+                datasets: [{
+                    data: Object.values(sourceCounts),
+                    backgroundColor: [palette.blue, palette.purple, palette.crimson, palette.peacock, "#6f86ff"]
+                }]
+            });
+
+            const sortedDates = Object.keys(timelineCounts).sort();
+            drawChart("timeline", "timelineChart", "line", {
+                labels: sortedDates,
+                datasets: [{
+                    label: "Scans",
+                    data: sortedDates.map((date) => timelineCounts[date]),
+                    borderColor: palette.crimson,
+                    backgroundColor: "rgba(124, 58, 237, 0.14)",
+                    tension: 0.35,
+                    fill: true
+                }]
+            });
+
+            const summary = document.getElementById("dashboardSummary");
+            if (!records.length) {
+                summary.innerHTML = '<div class="empty-state">Start scanning to generate trends and summaries.</div>';
+                return;
+            }
+
+            const dominantLanguage = Object.entries(languageCounts).sort((left, right) => right[1] - left[1])[0];
+            const dominantSource = Object.entries(sourceCounts).sort((left, right) => right[1] - left[1])[0];
+
+            summary.innerHTML = `
+                <div class="history-item">Most detected language so far is <strong>${dominantLanguage[0]}</strong>.</div>
+                <div class="history-item">Most common input source is <strong>${dominantSource[0]}</strong>.</div>
+                <div class="history-item">${appState.firebase.enabled ? "Cloud sync is on, so this dashboard includes Firestore-backed records too." : "Cloud sync is off, so this dashboard currently reflects local browser history."}</div>
+            `;
+        }
+
+        function switchView(nextView) {
+            appState.currentView = nextView;
+            document.querySelectorAll("[data-view-button]").forEach((button) => {
+                button.classList.toggle("active", button.dataset.viewButton === nextView);
+            });
+
+            ["chat", "history", "dashboard", "settings"].forEach((view) => {
+                document.getElementById(`view-${view}`).classList.toggle("hidden", view !== nextView);
+            });
+        }
+
+        function applyTheme(theme) {
+            appState.theme = theme === "dark" ? "dark" : "light";
+            document.body.classList.toggle("dark-theme", appState.theme === "dark");
+            localStorage.setItem(STORAGE_KEYS.theme, appState.theme);
+
+            const toggle = document.getElementById("themeToggleButton");
+            if (toggle) {
+                toggle.textContent = appState.theme === "dark" ? "Switch to light" : "Switch to dark";
+            }
+
+            renderDashboard();
+        }
+
+        function initializeTheme() {
+            const storedTheme = localStorage.getItem(STORAGE_KEYS.theme) || "light";
+            applyTheme(storedTheme);
+        }
+
+        async function handleTextAnalysis() {
+            const textInput = document.getElementById("textInput");
+            const value = textInput.value.trim();
+
+            if (!value) {
+                addMessage("assistant", "Add some text first and I'll analyze it.");
+                return;
+            }
+
+            addMessage("user", value, ["Text input"]);
+            textInput.value = "";
+            await analyzeAndStore(value, "Text");
+        }
+
+        async function handleImageUpload(file) {
+            addMessage("user", `Uploaded image: ${file.name}`, ["Image", `${Math.round(file.size / 1024)} KB`]);
+            addMessage("assistant", "Running OCR on the image now. This can take a few seconds for larger files.");
+
+            const { data } = await Tesseract.recognize(file, "eng");
+            const extracted = (data.text || "").trim();
+
+            if (!extracted) {
+                addMessage("assistant", "OCR finished, but I could not extract enough readable text from that image.");
+                return;
+            }
+
+            await analyzeAndStore(extracted, "Image OCR", {
+                fileName: file.name,
+                ocrTextLength: extracted.length
+            });
+        }
+
+        async function extractPdfText(file) {
+            const buffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+            const pages = [];
+
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+                const page = await pdf.getPage(pageNumber);
+                const content = await page.getTextContent();
+                pages.push(content.items.map((item) => item.str).join(" "));
+            }
+
+            return pages.join("\n");
+        }
+
+        async function extractDocumentText(file) {
+            const extension = file.name.split(".").pop().toLowerCase();
+
+            if (extension === "txt") {
+                return { text: await file.text(), documentType: "txt" };
+            }
+
+            if (extension === "pdf") {
+                return { text: await extractPdfText(file), documentType: "pdf" };
+            }
+
+            if (extension === "docx" || extension === "doc") {
+                const arrayBuffer = await file.arrayBuffer();
+                const { value } = await mammoth.extractRawText({ arrayBuffer });
+                return { text: value, documentType: extension };
+            }
+
+            throw new Error("Unsupported document type");
+        }
+
+        async function handleDocumentUpload(file) {
+            addMessage("user", `Uploaded document: ${file.name}`, ["Document", `${Math.round(file.size / 1024)} KB`]);
+            addMessage("assistant", "Parsing the document contents now.");
+
+            const extracted = await extractDocumentText(file);
+            const cleaned = extracted.text.trim();
+
+            if (!cleaned) {
+                addMessage("assistant", "The document loaded successfully, but it did not contain enough readable text to analyze.");
+                return;
+            }
+
+            await analyzeAndStore(cleaned, "Document", {
+                fileName: file.name,
+                documentType: extracted.documentType
+            });
+        }
+
+        function explainLatestResult() {
+            if (!appState.latestRecord) {
+                addMessage("assistant", "There is no recent result yet. Run a scan and I'll explain the reasoning.");
+                return;
+            }
+
+            const record = appState.latestRecord;
+            const explanation = [
+                `The latest scan leaned toward ${record.language} because its character patterns best matched that language profile.`,
+                `Confidence landed at ${record.confidence}% based on similarity across 2-gram to 4-gram patterns.`,
+                ...record.insights
+            ].join("\n");
+
+            addMessage("assistant", explanation, ["Explanation"]);
+        }
+
+        function bindEvents() {
+            document.querySelectorAll("[data-view-button]").forEach((button) => {
+                button.addEventListener("click", () => switchView(button.dataset.viewButton));
+            });
+
+            document.getElementById("themeToggleButton").addEventListener("click", () => {
+                applyTheme(appState.theme === "dark" ? "light" : "dark");
+            });
+
+            document.getElementById("analyzeTextButton").addEventListener("click", handleTextAnalysis);
+            document.getElementById("uploadImageButton").addEventListener("click", () => document.getElementById("imageInput").click());
+            document.getElementById("uploadDocumentButton").addEventListener("click", () => document.getElementById("documentInput").click());
+
+            document.getElementById("imageInput").addEventListener("change", async (event) => {
+                const file = event.target.files[0];
+                if (!file) {
+                    return;
+                }
+
+                try {
+                    await handleImageUpload(file);
+                } catch (error) {
+                    console.error(error);
+                    addMessage("assistant", "Image OCR failed. Check the browser console for more detail.");
+                } finally {
+                    event.target.value = "";
+                }
+            });
+
+            document.getElementById("documentInput").addEventListener("change", async (event) => {
+                const file = event.target.files[0];
+                if (!file) {
+                    return;
+                }
+
+                try {
+                    await handleDocumentUpload(file);
+                } catch (error) {
+                    console.error(error);
+                    addMessage("assistant", "Document parsing failed for that file type or content.");
+                } finally {
+                    event.target.value = "";
+                }
+            });
+
+            document.getElementById("sampleTextButton").addEventListener("click", () => {
+                document.getElementById("textInput").value = "Hola, este panel ahora admite texto, imagenes y documentos con historial inteligente.";
+            });
+
+            document.getElementById("explainLatestButton").addEventListener("click", explainLatestResult);
+            document.getElementById("clearChatButton").addEventListener("click", () => {
+                document.getElementById("chatThread").innerHTML = "";
+                addWelcomeMessage();
+            });
+
+            document.getElementById("saveFirebaseButton").addEventListener("click", async () => {
+                const raw = document.getElementById("firebaseConfigInput").value.trim();
+                if (!raw) {
+                    updateSyncUi("Paste your Firebase config JSON first.", false);
+                    return;
+                }
+
+                try {
+                    const config = JSON.parse(raw);
+                    await initializeFirebase(config);
+                    renderHistory();
+                    renderDashboard();
+                } catch (error) {
+                    console.error(error);
+                    updateSyncUi("Firebase config could not be initialized. Double-check the JSON fields.", false);
+                }
+            });
+
+            document.getElementById("removeFirebaseButton").addEventListener("click", disableFirebase);
+        }
+
+        function addWelcomeMessage() {
+            addMessage(
+                "assistant",
+                "I'm ready to detect language from text, extract text from images with OCR, parse uploaded documents, and save your scan history locally or in Firebase."
+            );
+        }
+
+        async function boot() {
+            loadLocalHistory();
+            initializeTheme();
+            const storedConfig = getStoredFirebaseConfig();
+
+            if (storedConfig) {
+                document.getElementById("firebaseConfigInput").value = JSON.stringify(storedConfig, null, 2);
+                try {
+                    await initializeFirebase(storedConfig);
+                } catch (error) {
+                    console.error(error);
+                    disableFirebase();
+                }
+            } else {
+                updateSyncUi("Cloud sync is currently off. Local history is still working.", false);
+            }
+
+            bindEvents();
+            addWelcomeMessage();
+
+            if (appState.history.length) {
+                appState.latestRecord = appState.history[0];
+            }
+
+            renderHistory();
+            renderDashboard();
+            renderLatest();
+            renderStats();
+        }
+
+        boot();
+    </script>
+</body>
+</html>
